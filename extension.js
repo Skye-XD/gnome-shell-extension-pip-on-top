@@ -98,9 +98,28 @@ export default class PipOnTop extends Extension
   {
     if (!window._notifyPipTitleId) {
       window._notifyPipTitleId = window.connect_after(
-        'notify::title', this._checkTitle.bind(this));
+        'notify::title', this._queueCheckTitle.bind(this));
     }
-    this._checkTitle(window);
+    this._queueCheckTitle(window);
+  }
+
+  /* Never restack from inside window-added or a title change: an X11 window is
+   * added to its workspace before Mutter has placed it in the stack, and
+   * make_above() then trips "Window had stack position already" and aborts
+   * the shell. Check once Mutter is done, before the next redraw. */
+  _queueCheckTitle(window)
+  {
+    if (window._pipCheckQueued)
+      return;
+    window._pipCheckQueued = true;
+
+    global.compositor.get_laters().add(Meta.LaterType.BEFORE_REDRAW, () => {
+      window._pipCheckQueued = false;
+      /* Disabled, or the window unmanaged, in the meantime */
+      if (this.settings && window.get_compositor_private())
+        this._checkTitle(window);
+      return false;
+    });
   }
 
   _onWindowRemoved(workspace, window)
