@@ -113,6 +113,22 @@ export default class PipOnTop extends Extension
       window._isPipAble = null;
   }
 
+  /* Chromium-based browsers title every window of their own
+   * "<page> - Google Chrome" (or "- Chromium"); their picture-in-picture
+   * windows -- video PiP, and the Document PiP that Spotify's mini player and
+   * others use, titled after the current track -- carry no such suffix. Web
+   * apps run under their own wm_class, so they are not caught here. */
+  _isChromiumPip(window)
+  {
+    const wmClass = (window.wm_class || '').toLowerCase();
+    if (!['google-chrome', 'chromium', 'chromium-browser'].includes(wmClass))
+      return false;
+
+    const title = window.title;
+    return !/ - (Google Chrome|Chromium)$/.test(title)
+      && !title.startsWith('DevTools');
+  }
+
   _checkTitle(window)
   {
     if (!window.title)
@@ -128,7 +144,8 @@ export default class PipOnTop extends Extension
       /* Telegram support */
       || window.title == 'TelegramDesktop'
       /* Yandex.Browser support YouTube */
-      || window.title.endsWith(' - YouTube'));
+      || window.title.endsWith(' - YouTube')
+      || this._isChromiumPip(window));
 
     if (isPipWin || window._isPipAble) {
       let un = (isPipWin) ? '' : 'un';
