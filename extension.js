@@ -132,10 +132,15 @@ export default class PipOnTop extends Extension
       window._isPipAble = null;
   }
 
-  /* Chromium-based browsers title every window of their own
-   * "<page> - Google Chrome" (or "- Chromium"); their picture-in-picture
-   * windows -- video PiP, and the Document PiP that Spotify's mini player and
-   * others use, titled after the current track -- carry no such suffix. Web
+  /* Chromium's Document PiP (Spotify's mini player and the like), titled
+   * after the current track. Every other window Chrome draws itself is titled
+   * "<page> - Google Chrome" (or "- Chromium"), but a title alone also caught
+   * windows titled just "Google Chrome" (the profile picker) and Chrome's own
+   * GTK dialogs (Print), which are pinned on top for good under X11. So: a
+   * dialog or a window attached to a parent is never PiP, and under X11, where
+   * Chrome names its windows' roles, Document PiP is a "pop-up" (normal windows
+   * are "browser"). Wayland has no roles; the title test alone decides there.
+   * Video PiP is titled "Picture in picture" and caught by name above. Web
    * apps run under their own wm_class, so they are not caught here. */
   _isChromiumPip(window)
   {
@@ -143,9 +148,15 @@ export default class PipOnTop extends Extension
     if (!['google-chrome', 'chromium', 'chromium-browser'].includes(wmClass))
       return false;
 
+    if (window.get_window_type() !== Meta.WindowType.NORMAL || window.get_transient_for())
+      return false;
+
     const title = window.title;
-    return !/ - (Google Chrome|Chromium)$/.test(title)
-      && !title.startsWith('DevTools');
+    if (/(^| - )(Google Chrome|Chromium)$/.test(title) || title.startsWith('DevTools'))
+      return false;
+
+    const role = window.get_role();
+    return !role || role === 'pop-up';
   }
 
   _checkTitle(window)
